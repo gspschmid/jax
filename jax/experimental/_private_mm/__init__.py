@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from jax.experimental._private_mm import launch_utils as launch_utils
 from jax.experimental._private_mm.mm import (
     device_put as device_put,
     jit as jit,

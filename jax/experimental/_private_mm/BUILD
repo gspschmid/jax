@@ -23,13 +23,14 @@ package(
 py_library(
     name = "private_mm",
     srcs = ["__init__.py"],
+    visibility = ["//visibility:public"],  #???
     deps = [":private_mm_internal"],
 )
 
 py_library(
     name = "private_mm_internal",
     srcs = [
-        "example_utils.py",
+        "launch_utils.py",
         "mini_dime.py",
         "mm.py",
         "profile_utils.py",

@@ -20,7 +20,6 @@ import jax.numpy as jnp
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
 from jax.experimental import _private_mm as mm
-from jax.experimental._private_mm.examples import launch_utils
 
 
 def step():
@@ -75,5 +74,5 @@ if __name__ == '__main__':
     num_processes = 2
     if len(sys.argv) >= 2:
         num_processes = int(sys.argv[1])
-    success = launch_utils.launch_example(num_processes, example_basic)
+    success = mm.launch_utils.launch_example(num_processes, example_basic)
     sys.exit(0 if success else 1)

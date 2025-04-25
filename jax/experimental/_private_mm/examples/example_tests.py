@@ -20,7 +20,6 @@ import jax.numpy as jnp
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
 from jax.experimental import _private_mm as mm
-from jax.experimental._private_mm.examples import launch_utils
 
 
 def make_two_meshes():
@@ -64,7 +63,7 @@ def test_jit_and_transfer(_num_processes, process_id):
 
 def run_test(num_processes, test_fun, name):
     print(f' - {name} ... ', end='', flush=True)
-    success = launch_utils.launch_example(num_processes, test_fun)
+    success = mm.launch_utils.launch_example(num_processes, test_fun)
     if success:
         print('OK')
     else:

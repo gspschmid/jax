@@ -94,7 +94,7 @@ local_comms: dict = {}
 
 
 def get_or_create_comm(devs: UniqueDevices):
-    TIMEOUT = 5_000
+    TIMEOUT = 30_000
 
     comm = local_comms.get(devs)
     my_process_index = jax.process_index()
