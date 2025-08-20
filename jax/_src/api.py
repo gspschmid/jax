@@ -461,6 +461,8 @@ def value_and_grad(fun: Callable, argnums: int | Sequence[int] = 0,
   check_callable(fun)
   argnums = core.concrete_or_error(_ensure_index, argnums)
 
+  grad_acc = None
+
   @wraps(fun, docstr=docstr, argnums=argnums)
   @api_boundary
   def value_and_grad_f(*args, **kwargs):
@@ -476,15 +478,29 @@ def value_and_grad(fun: Callable, argnums: int | Sequence[int] = 0,
                                           require_static_args_hashable=False)
     for leaf in tree_leaves(dyn_args):
       _check_input_dtype_grad(holomorphic, allow_int, leaf)
-    jax_vjp = _vjp3_on_wrapped if use_vjp3 else _vjp
+    if use_vjp3:
+      jax_vjp = _vjp3_on_wrapped
+      nonlocal grad_acc
+      if grad_acc is None:
+        assert isinstance(argnums, int), argnums
+        import jax.numpy as jnp  # pytype: disable=import-error
+        grad_acc = tree_map(lambda x: core.array_ref(jnp.zeros_like(x)), args[argnums])
+    else:
+      jax_vjp = _vjp
     if not has_aux:
       ans, vjp_py = jax_vjp(f_partial, *dyn_args)
     else:
       ans, vjp_py, aux = jax_vjp(f_partial, *dyn_args, has_aux=True)
     _check_scalar(ans)
     tree_map(partial(_check_output_dtype_grad, holomorphic), ans)
-    g = vjp_py(lax_internal._one(ans))
-    g = g[0] if isinstance(argnums, int) else g
+    if use_vjp3:
+      assert len(dyn_args) == 1, f"!!! {dyn_args=}"
+      vjp_py.with_refs(grad_acc)(lax_internal._one(ans))
+      assert isinstance(argnums, int), argnums
+      g = tree_map(lambda x: core.freeze(x), grad_acc)
+    else:
+      g = vjp_py(lax_internal._one(ans))
+      g = g[0] if isinstance(argnums, int) else g
     if not has_aux:
       return ans, g
     else:

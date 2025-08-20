@@ -615,8 +615,8 @@ class ValAccum(GradAccum):
 #   def accum(self, x): return
 #   def freeze(self): assert False
 
-core.pytype_aval_mappings[RefAccum] = lambda x: x.aval
-core.pytype_aval_mappings[ValAccum] = lambda x: x.aval
+# core.pytype_aval_mappings[RefAccum] = lambda x: x.aval
+# core.pytype_aval_mappings[ValAccum] = lambda x: x.aval
 
 
 fancy_transposes: dict[core.Primitive, Callable] = {}
