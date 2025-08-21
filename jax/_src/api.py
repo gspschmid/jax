@@ -417,7 +417,7 @@ def grad(fun: Callable, argnums: int | Sequence[int] = 0,
 def value_and_grad(fun: Callable, argnums: int | Sequence[int] = 0,
                    has_aux: bool = False, holomorphic: bool = False,
                    allow_int: bool = False, reduce_axes: Sequence[AxisName] = (),
-                   use_vjp3: bool = True,  # REMOVE-ME: Exercise vjp3 in tests!
+                   grad_acc: Any | None = None,
   ) -> Callable[..., tuple[Any, Any]]:
   """Create a function that evaluates both ``fun`` and the gradient of ``fun``.
 
@@ -461,8 +461,6 @@ def value_and_grad(fun: Callable, argnums: int | Sequence[int] = 0,
   check_callable(fun)
   argnums = core.concrete_or_error(_ensure_index, argnums)
 
-  grad_acc = None
-
   @wraps(fun, docstr=docstr, argnums=argnums)
   @api_boundary
   def value_and_grad_f(*args, **kwargs):
@@ -478,13 +476,10 @@ def value_and_grad(fun: Callable, argnums: int | Sequence[int] = 0,
                                           require_static_args_hashable=False)
     for leaf in tree_leaves(dyn_args):
       _check_input_dtype_grad(holomorphic, allow_int, leaf)
-    if use_vjp3:
+    if grad_acc is not None:
       jax_vjp = _vjp3_on_wrapped
-      nonlocal grad_acc
-      if grad_acc is None:
-        assert isinstance(argnums, int), argnums
-        import jax.numpy as jnp  # pytype: disable=import-error
-        grad_acc = tree_map(lambda x: core.array_ref(jnp.zeros_like(x)), args[argnums])
+      assert isinstance(argnums, int), f"only a single argnums is supported at the moment, got {argnums=}"
+      assert (t1 := tree_structure(grad_acc)) == (t2 := tree_structure(args[argnums])), f"{t1=}  <>  {t2=}"
     else:
       jax_vjp = _vjp
     if not has_aux:
@@ -493,11 +488,9 @@ def value_and_grad(fun: Callable, argnums: int | Sequence[int] = 0,
       ans, vjp_py, aux = jax_vjp(f_partial, *dyn_args, has_aux=True)
     _check_scalar(ans)
     tree_map(partial(_check_output_dtype_grad, holomorphic), ans)
-    if use_vjp3:
-      assert len(dyn_args) == 1, f"!!! {dyn_args=}"
+    if grad_acc is not None:
       vjp_py.with_refs(grad_acc)(lax_internal._one(ans))
-      assert isinstance(argnums, int), argnums
-      g = tree_map(lambda x: core.freeze(x), grad_acc)
+      g = ()
     else:
       g = vjp_py(lax_internal._one(ans))
       g = g[0] if isinstance(argnums, int) else g
