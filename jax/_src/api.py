@@ -416,7 +416,8 @@ def grad(fun: Callable, argnums: int | Sequence[int] = 0,
 
 def value_and_grad(fun: Callable, argnums: int | Sequence[int] = 0,
                    has_aux: bool = False, holomorphic: bool = False,
-                   allow_int: bool = False, reduce_axes: Sequence[AxisName] = ()
+                   allow_int: bool = False, reduce_axes: Sequence[AxisName] = (),
+                   grad_acc: Any | None = None,
   ) -> Callable[..., tuple[Any, Any]]:
   """Create a function that evaluates both ``fun`` and the gradient of ``fun``.
 
@@ -475,14 +476,24 @@ def value_and_grad(fun: Callable, argnums: int | Sequence[int] = 0,
                                           require_static_args_hashable=False)
     for leaf in tree_leaves(dyn_args):
       _check_input_dtype_grad(holomorphic, allow_int, leaf)
-    if not has_aux:
-      ans, vjp_py = _vjp(f_partial, *dyn_args)
+    if grad_acc is not None:
+      jax_vjp = _vjp3
+      assert isinstance(argnums, int), f"only a single argnums is supported at the moment, got {argnums=}"
+      assert (t1 := tree_structure(grad_acc)) == (t2 := tree_structure(args[argnums])), f"{t1=}  <>  {t2=}"
     else:
-      ans, vjp_py, aux = _vjp(f_partial, *dyn_args, has_aux=True)
+      jax_vjp = _vjp
+    if not has_aux:
+      ans, vjp_py = jax_vjp(f_partial, *dyn_args)
+    else:
+      ans, vjp_py, aux = jax_vjp(f_partial, *dyn_args, has_aux=True)
     _check_scalar(ans)
     tree_map(partial(_check_output_dtype_grad, holomorphic), ans)
-    g = vjp_py(lax_internal._one(ans))
-    g = g[0] if isinstance(argnums, int) else g
+    if grad_acc is not None:
+      vjp_py.with_refs(grad_acc)(lax_internal._one(ans))
+      g = ()
+    else:
+      g = vjp_py(lax_internal._one(ans))
+      g = g[0] if isinstance(argnums, int) else g
     if not has_aux:
       return ans, g
     else:
